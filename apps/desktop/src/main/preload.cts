@@ -14,6 +14,19 @@ type PrintPdfOptions = {
 // compromised renderer cannot name an arbitrary baseDir even
 // indirectly because the picker dialog is the single source of paths
 // crossing into the daemon, and it lives in the main process.
+
+// Keep this file dependency-free at runtime: in sandbox: true preloads only
+// the `electron` module is safe to require. The diagnostics channel name is
+// duplicated from main/diagnostics.ts on purpose so the preload bundle does
+// not pull in node-only modules transitively.
+const DESKTOP_DIAGNOSTICS_IPC_CHANNEL = 'diagnostics:export-to-file';
+
+type DesktopDiagnosticsExportResult =
+  | { ok: true; path: string }
+  | { ok: false; cancelled: true }
+  | { ok: false; cancelled: false; message: string };
+
+
 contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (url: string): Promise<boolean> =>
     ipcRenderer.invoke('shell:open-external', url),
@@ -37,4 +50,9 @@ contextBridge.exposeInMainWorld('__odDesktop', {
   printPdf: (html: string, nonce?: string, options?: PrintPdfOptions) =>
     ipcRenderer.invoke('od:print-pdf', html, nonce, options ?? null),
   isDesktop: true,
+});
+
+contextBridge.exposeInMainWorld('openDesignDesktop', {
+  exportDiagnostics: (): Promise<DesktopDiagnosticsExportResult> =>
+    ipcRenderer.invoke(DESKTOP_DIAGNOSTICS_IPC_CHANNEL) as Promise<DesktopDiagnosticsExportResult>,
 });
